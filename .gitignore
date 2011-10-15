@@ -1,4 +1,7 @@
 
+.idea/*
 .idea/workspace.xml
-
 .idea/misc.xml
+
+test_data/*
+test_data/**
