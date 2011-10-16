@@ -16,7 +16,7 @@ root_dir = 'test_data/'
 
 directories = {
 'ori_data_dir': root_dir+'original/',      # original data
-'combined_dir': root_dir+'combined',       # combined fwd/rev read sets
+'combined_dir': root_dir+'combined/',       # combined fwd/rev read sets
 
 'blast_db_dir': root_dir+'blast_db/',      # blast databases
 'reports_dir': root_dir+'reports/'         # reports

@@ -70,8 +70,8 @@ def FastqJointIterator(handleA, handleB):
     while True:
         lineA = handleA_readline()
         lineB = handleB_readline()
-        if lineA == "" and lineB == "": return
-        if lineA[0] == "@" and lineB[0] == "@":
+        if lineA == "" or lineB == "": return
+        if lineA[0] == "@" or lineB[0] == "@":
             break
     while True:
         title_lines = []
@@ -91,7 +91,9 @@ def FastqJointIterator(handleA, handleB):
                 lineA = handleA_readline()
                 lineB = handleB_readline()
                 if not lineA:
-                    raise ValueError("End of file without quality info.")
+                    raise ValueError("End of file without quality info (A).")
+                if not lineB:
+                    raise ValueError("End of file without quality info (B).")
                 if lineA[0] == "+" and lineB[0] == "+":
                     second_titleA = lineA[1:].rstrip()
                     second_titleB = lineB[1:].rstrip()
@@ -113,13 +115,15 @@ def FastqJointIterator(handleA, handleB):
             quality_strings.append((quality_stringA, quality_stringB))
             while True:
                 lineA = handleA_readline()
-                if not lineA and not lineB: break #end of file
-                if lineA[0] == "@" and lineB[0] == "@":
-                    if len(quality_stringA) >= seq_lenA:
-                        break
-                    if len(quality_stringB) >= seq_lenB:
+                lineB = handleB_readline()
+                if not lineA or not lineB: break #end of file
+                if lineA[0] == "@":
+                    if len(quality_stringA) >= seq_lenA :
                         break
                 quality_stringA += lineA.rstrip()
+                if lineB[0] == "@":
+                    if len(quality_stringB) >= seq_lenB:
+                        break
                 quality_stringB += lineB.rstrip()
             if seq_lenA != len(quality_stringA):
                 raise ValueError("Lengths of seq and qual values differs "
@@ -133,7 +137,7 @@ def FastqJointIterator(handleA, handleB):
                                     len(quality_stringB)))
             count +=1
         yield (title_lines, seq_strings, quality_strings)
-        if not lineA and not lineB: return #StopIteration at end of file
+        if not lineA or not lineB: return #StopIteration at end of file
     assert False, "Should not reach this line"
 
 def combine_illumina(dataset):
@@ -146,14 +150,25 @@ def combine_illumina(dataset):
     """
     print " ", dataset['run_id']
     # identify inputs and outputs
-    fwd_file = dataset['source_fwd']
-    rev_file = dataset['source_rev']
-    combined_file = dirs['combined_dir']+dataset['run_id']+".txt"
+    ori_root = dirs['ori_data_dir']
+    run_nick = dataset['run_id']
+    fwd_file = ori_root+run_nick+"/"+dataset['source_fwd']
+    rev_file = ori_root+run_nick+"/"+dataset['source_rev']
+    combined_file = dirs['combined_dir']+run_nick+".txt"
     # start shuffling
-    combined_out = open(combined_file, 'w')
-    read_count = 0
-    for titles, seqs, quals in FastqGeneralIterator(open(fwd_file)) :
-        print titles, seqs, quals
-        read_count +=1
-        if read_count >= 10:
-            break
+    co_out = open(combined_file, 'w')
+    pair_count = 0
+    for titles, seqs, quals in FastqJointIterator(open(fwd_file), 
+                                                  open(rev_file)) :
+        F_title, R_title = titles
+        F_seq, R_seq = seqs
+        F_qual, R_qual = quals
+        # output to combined file
+        co_out.write("@%s\n%s\n+\n%s\n" % (F_title, F_seq, F_qual))
+        co_out.write("@%s\n%s\n+\n%s\n" % (R_title, R_seq, R_qual))
+        # increment counter
+        pair_count +=1
+        # report on the progress
+        if pair_count%100000==0:
+            print "\t", pair_count, "read pairs processed"
+    co_out.close()

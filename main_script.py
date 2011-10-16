@@ -31,6 +31,7 @@ if step is 1:
     print "\n###", step, ". Combine Illumina read sets ###"
     for dataset in datasets:
         combine_illumina(dataset)
+    step +=1
 
 if step > 2:
     print "\n### Nothing more to do! ###\n"
