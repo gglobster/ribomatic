@@ -1,6 +1,6 @@
 from sys import argv, exit
 from libs.common import ensure_dir
-from libs.ngs_process import combine_illumina
+from libs.ngs_process import demux_illumina
 from config import datasets, directories
 
 print "\n", \
@@ -21,16 +21,16 @@ else:
 
 if step is 0:
     ### STEP 0: Ensure that all base directories exist ###
-    print "\n###", step, ". Setting up the work environment ###"
+    print "\n###", step, ". Set up the work environment ###"
     for dir_name in directories.keys():
         ensure_dir(directories[dir_name])
     step +=1
 
 if step is 1:
-    ### STEP 1: Combine Illumina read sets ###
-    print "\n###", step, ". Combine Illumina read sets ###"
+    ### STEP 1: Demux Illumina read sets ###
+    print "\n###", step, ". Demultiplex Illumina read sets ###"
     for dataset in datasets:
-        combine_illumina(dataset)
+        demux_illumina(dataset)
     step +=1
 
 if step > 2:

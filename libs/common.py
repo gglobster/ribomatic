@@ -17,3 +17,7 @@ def ensure_dir(dir_path):
     report = {'message': message, 'status': status}
     return abs_path, report
 
+def key_by_value(dict, value):
+    """Find the key(s) of a dictionary for a given value."""
+    key_list = [key for key, val in dict.iteritems() if val == value]
+    return key_list
