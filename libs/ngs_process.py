@@ -1,5 +1,6 @@
+from datetime import datetime
 from config import directories as dirs
-from common import ensure_dir, key_by_value
+from common import ensure_dir, key_by_value, dump_buffer
 from Bio.SeqIO.QualityIO import FastqGeneralIterator
 
 def FastqGGIterator(handle):
@@ -155,9 +156,14 @@ def demux_illumina(dataset):
     demux_root = dirs['demux']+run_root
     ensure_dir(demux_root)
     # prepare primers and barcodes info
+    primers = dataset['primers']
     samples = dataset['samples']
     tags = samples.values()
-    primers = dataset['primers']
+    # prepare container for output batching and reporting
+    hits_dict = {}
+    for sample_id in samples:
+        hits_dict[sample_id] = {'buffer': [], 'counter': 0}
+    hits_dict['rejected'] = {'buffer': [], 'counter': 0}
     # iterate through reads
     pair_count = 0
     for titles, seqs, quals in FastqJointIterator(open(fwd_file),
@@ -208,21 +214,41 @@ def demux_illumina(dataset):
                 break
         # in case no matches were found with any of the tags
         if not sample_id:
-            sample_id = 'no_tag'
-        # output to the appropriate file
-        dmx_out = demux_root+sample_id+"_readpairs.txt"
+            sample_id = 'rejected'
+        # bundle read data in ordered string
+        readF = str("@%s\n%s\n+\n%s\n" % (F_title, F_seq, F_qual))
+        readR = str("@%s\n%s\n+\n%s\n" % (R_title, R_seq, R_qual))
         if flip:
-            open(dmx_out, 'a').write("@%s\n%s\n+\n%s\n" % (R_title, R_seq,
-                                                           R_qual))
-            open(dmx_out, 'a').write("@%s\n%s\n+\n%s\n" % (F_title, F_seq,
-                                                           F_qual))
+            read_pair = readR+readF
         else:
-            open(dmx_out, 'a').write("@%s\n%s\n+\n%s\n" % (F_title, F_seq,
-                                                           F_qual))
-            open(dmx_out, 'a').write("@%s\n%s\n+\n%s\n" % (R_title, R_seq,
-                                                           R_qual))
+            read_pair = readF+readR
+        # output to the appropriate buffer
+        hits_dict[sample_id]['buffer'].append(read_pair)
+        # increment sample hit counter
+        hits_dict[sample_id]['counter'] +=1
+        # when buffer capacity is reached, output to file and reset buffer
+        if hits_dict[sample_id]['counter']% 10000==0:
+            dmx_out = demux_root+sample_id+"_readpairs.txt"
+            dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
+            hits_dict[sample_id]['buffer'] = []
+            #print sample_id, "buffer reset @",
+            # hits_dict[sample_id]['counter']
         # increment counter
         pair_count +=1
         # report on the progress
         if pair_count%100000==0:
-            print "\t", pair_count, "read pairs processed"
+            print "\t", pair_count, "reads processed", datetime.now()
+#        if pair_count == 1000000: # for inspection purposes
+#            break
+    print "\t", "Counts per sample out of", pair_count, "total"
+    # write out whatever remains in each of the samples buffers
+    for sample_id in samples:
+        dmx_out = demux_root+sample_id+"_readpairs.txt"
+        dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
+        hits_dict[sample_id]['buffer'] = []
+        print "\t\t", sample_id, hits_dict[sample_id]['counter']
+    # write out whatever remains in the rejected reads buffer
+    dmx_out = demux_root+"rejected_readpairs.txt"
+    dump_buffer(dmx_out, hits_dict['rejected']['buffer'])
+    hits_dict['rejected']['buffer'] = []
+    print "\t\t", "rejected", hits_dict['rejected']['counter']

@@ -21,3 +21,10 @@ def key_by_value(dict, value):
     """Find the key(s) of a dictionary for a given value."""
     key_list = [key for key, val in dict.iteritems() if val == value]
     return key_list
+
+def dump_buffer(filename, buffer):
+    """Write string contents of a buffer to a file."""
+    outfile = open(filename, 'a')
+    for string in buffer:
+        outfile.write(string)
+    outfile.close()

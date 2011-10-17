@@ -7,5 +7,12 @@
 \f0\b\fs24 \cf0 Development notes
 \b0 \
 \
-Issue encountered while testing barcode recognition:\
-Fact sheet provided for "Illumina run 5" contain incorrect Ltag information.}
+Issues encountered while testing barcode recognition:\
+\
+1) Fact sheet provided for "Illumina run 5" contain incorrect Ltag information. Correct information obtained from "primers for illumine barcoded.xls"\
+\
+2) Had to put in a workaround to deal with ambiguous bases in primers. Works with this specific set of primers but may break with other sets. Should implement a more robust solution in future.\
+\
+3) File I/O operations are killing speed; implement a batch/dump solution to optimize.\
+\
+}
