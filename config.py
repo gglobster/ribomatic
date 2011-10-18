@@ -38,3 +38,8 @@ directories = {
 'blast_db': root_dir+'blast_db/',      # blast databases
 'reports': root_dir+'reports/'         # reports
 }
+
+# Parameters
+
+# read pair length min threshold (ensures overlap)
+rp_min_len = 120

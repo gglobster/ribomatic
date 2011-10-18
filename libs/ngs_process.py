@@ -1,7 +1,8 @@
 from datetime import datetime
-from config import directories as dirs
+from config import directories as dirs, rp_min_len
 from common import ensure_dir, key_by_value, dump_buffer
 from Bio.SeqIO.QualityIO import FastqGeneralIterator
+from graphics import two_storey_bar_chart
 
 def FastqGGIterator(handle):
     """Iterate over 2 Fastq records as string tuples.
@@ -144,44 +145,51 @@ def demux_illumina(dataset):
     From separate forward/reverse read sets, combine read pairs and output
     to separate files for each sample based on barcode tags. As part of the
     process, reject read pairs that have mismatching tags or primers and trim
-    the rest.
+    the rest, removing primer+tag and low-quality sequences.
 
     """
-    print " ", dataset['run_id']
     # identify inputs and outputs
+    run_id = dataset['run_id']
     ori_root = dirs['ori_data']
-    run_root = dataset['run_id']+"/"
+    run_root = run_id+"/"
     fwd_file = ori_root+run_root+dataset['source_fwd']
     rev_file = ori_root+run_root+dataset['source_rev']
     demux_root = dirs['demux']+run_root
+    cnts_plot_name = dirs['reports']+run_root+"sample_counts"
     ensure_dir(demux_root)
+    print " ", run_id
     # prepare primers and barcodes info
     primers = dataset['primers']
     samples = dataset['samples']
-    tags = samples.values()
+    tag_pairs = samples.values()
+    assert len(primers) >= 2
+    assert len(samples) >= 1
+    assert len(tag_pairs) >= 1
     # prepare container for output batching and reporting
     hits_dict = {}
     for sample_id in samples:
-        hits_dict[sample_id] = {'buffer': [], 'counter': 0}
-    hits_dict['rejected'] = {'buffer': [], 'counter': 0}
+        hits_dict[sample_id] = {'buffer': [], 'countY': 0, 'countN': 0}
+    # add containers for rejected read pairs
+    hits_dict['bad_tags'] = {'buffer': [], 'countY': 0, 'countN': 0}
+    hits_dict['bad_qual'] = {'buffer': [], 'countY': 0, 'countN': 0}
     # iterate through reads
     pair_count = 0
     for titles, seqs, quals in FastqJointIterator(open(fwd_file),
                                                   open(rev_file)) :
-        F_title = titles[0][0].lower()
-        R_title = titles[0][1].lower()
-        F_seq = seqs[0][0].lower()
-        R_seq = seqs[0][1].lower()
-        F_qual = quals[0][0].lower()
-        R_qual = quals[0][1].lower()
+        F_title = titles[0][0]
+        R_title = titles[0][1]
+        F_seq = seqs[0][0].upper()
+        R_seq = seqs[0][1].upper()
+        F_qual = quals[0][0]
+        R_qual = quals[0][1]
         flip = False
         sample_id = False
         # iterate through barcode tags
         # TODO: implement more robust solution to ambiguous base problem
-        for tag in tags:
-            L_tag1 = (tag[0]+primers['fwdRA']).lower()
-            L_tag2 = (tag[0]+primers['fwdRG']).lower()
-            R_tag = (tag[1]+primers['rev']).lower()
+        for tag_pair in tag_pairs:
+            L_tag1 = (tag_pair[0]+primers['fwdRA']).upper()
+            L_tag2 = (tag_pair[0]+primers['fwdRG']).upper()
+            R_tag = (tag_pair[1]+primers['rev']).upper()
             tag_hit = False
             while True:
                 # start by checking For R_tag since there's only one
@@ -195,8 +203,13 @@ def demux_illumina(dataset):
                                 if not R_seq.find(L_tag2, 0, len(L_tag2)) is 0:
                                     # no L_tag match -> reject
                                     break
+                                else:
+                                    R_clip = len(L_tag2)
+                            else:
+                                R_clip = len(L_tag1)
                             tag_hit = True
                             flip = True
+                            F_clip = len(R_tag)
                             break
                 else: # is there an L_tag in F_seq?
                     while True:
@@ -204,17 +217,42 @@ def demux_illumina(dataset):
                             if not F_seq.find(L_tag2, 0, len(L_tag2)) is 0:
                                 # no L_tag match -> reject
                                 break
+                            else:
+                                F_clip = len(L_tag2)
+                        else:
+                            F_clip = len(L_tag1)
                         tag_hit = True
+                        R_clip = len(R_tag)
                         break
                 break
             if not tag_hit:     # continue iterating
                 sample_id = False
             else:               # got it, stop iterating
-                sample_id = key_by_value(samples, tag)[0]
+                sample_id = key_by_value(samples, tag_pair)[0]
                 break
         # in case no matches were found with any of the tags
         if not sample_id:
-            sample_id = 'rejected'
+            sample_id = 'bad_tags'
+        # for matched read pairs, clip off tag+primer and strip low qual runs
+        else:
+            F_trim = F_qual[F_clip:].find('BB')
+            if F_trim > -1:
+                F_seq = F_seq[F_clip:F_clip+F_trim]
+                F_qual = F_qual[F_clip:F_clip+F_trim]
+            else:
+                F_seq = F_seq[F_clip:]
+                F_qual = F_qual[F_clip:]
+            R_trim = R_qual[R_clip:].find('BB')
+            if R_trim > -1:
+                R_seq = R_seq[R_clip:R_clip+R_trim]
+                R_qual = R_qual[R_clip:R_clip+R_trim]
+            else:
+                R_seq = R_seq[R_clip:]
+                R_qual = R_qual[R_clip:]
+            if len(F_seq)+len(R_seq) < rp_min_len:
+                # increment sample hit 'No' counter
+                hits_dict[sample_id]['countN'] +=1
+                sample_id = 'bad_qual'
         # bundle read data in ordered string
         readF = str("@%s\n%s\n+\n%s\n" % (F_title, F_seq, F_qual))
         readR = str("@%s\n%s\n+\n%s\n" % (R_title, R_seq, R_qual))
@@ -224,31 +262,52 @@ def demux_illumina(dataset):
             read_pair = readF+readR
         # output to the appropriate buffer
         hits_dict[sample_id]['buffer'].append(read_pair)
-        # increment sample hit counter
-        hits_dict[sample_id]['counter'] +=1
+        # increment sample 'Yes' hit counter
+        hits_dict[sample_id]['countY'] +=1
         # when buffer capacity is reached, output to file and reset buffer
         if hits_dict[sample_id]['counter']% 10000==0:
             dmx_out = demux_root+sample_id+"_readpairs.txt"
             dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
             hits_dict[sample_id]['buffer'] = []
-            #print sample_id, "buffer reset @",
-            # hits_dict[sample_id]['counter']
         # increment counter
         pair_count +=1
         # report on the progress
         if pair_count%100000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-#        if pair_count == 1000000: # for inspection purposes
-#            break
+        if pair_count == 1000000: # for inspection purposes
+            break
     print "\t", "Counts per sample out of", pair_count, "total"
+    # prepare graphing data containers
+    pcntY = []
+    pcntN = []
+    sample_ids = []
     # write out whatever remains in each of the samples buffers
     for sample_id in samples:
         dmx_out = demux_root+sample_id+"_readpairs.txt"
         dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
         hits_dict[sample_id]['buffer'] = []
-        print "\t\t", sample_id, hits_dict[sample_id]['counter']
-    # write out whatever remains in the rejected reads buffer
-    dmx_out = demux_root+"rejected_readpairs.txt"
-    dump_buffer(dmx_out, hits_dict['rejected']['buffer'])
-    hits_dict['rejected']['buffer'] = []
-    print "\t\t", "rejected", hits_dict['rejected']['counter']
+        print "\t\t", sample_id, hits_dict[sample_id]['countY']
+        pcntY.append(hits_dict[sample_id]['countY'])
+        pcntN.append(hits_dict[sample_id]['countN'])
+        sample_ids.append(sample_id)
+    # write out whatever remains in the bad_tags buffer
+    dmx_out = demux_root+"bad_tags_readpairs.txt"
+    dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
+    hits_dict['bad_tags']['buffer'] = []
+    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY']
+    # add bad tags category for counts graphing (switch is on purpose)
+    pcntY.append(hits_dict['bad_tags']['countN'])
+    pcntN.append(hits_dict['bad_tags']['countY'])
+    sample_ids.append('bad_tags')
+    # write out whatever remains in the bad_qual buffer
+    dmx_out = demux_root+"bad_qual_readpairs.txt"
+    dump_buffer(dmx_out, hits_dict['bad_qual']['buffer'])
+    hits_dict['bad_qual']['buffer'] = []
+    print "\t\t", "rejected (low quality)", hits_dict['bad_qual']['countY']
+    # check that the totals add up
+    assert pair_count == sum(pcntY)+sum(pcntN)
+    # plot the read counts per sample
+    series = pcntY, pcntN
+    legend = 'Accepted', 'Rejected'
+    colors = 'g', 'r'
+    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
