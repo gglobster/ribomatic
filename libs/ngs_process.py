@@ -156,9 +156,15 @@ def demux_illumina(dataset):
     rev_file = ori_root+run_root+dataset['source_rev']
     demux_root = dirs['demux']+run_root
     report_root = dirs['reports']+run_root
+    qc_dir = "qc_details/"
+    qc_main_file = report_root+"quality_control.html"
     cnts_plot_name = report_root+"sample_counts"
     ensure_dir(demux_root)
     ensure_dir(report_root)
+    ensure_dir(report_root+qc_dir)
+    # set up files for reporting
+    open(qc_main_file, 'w').write("<p><b>Quality control for run "+run_id+"</b></p>")
+    open(qc_main_file, 'a').write("<p><img src='sample_counts.png' alt='sample_counts'/></p>")
     print " ", run_id
     # prepare primers and barcodes info
     primers = dataset['primers']
@@ -167,13 +173,19 @@ def demux_illumina(dataset):
     assert len(primers) >= 2
     assert len(samples) >= 1
     assert len(tag_pairs) >= 1
-    # prepare container for output batching and reporting
+    # prepare container and files for output batching and reporting
     hits_dict = {}
     for sample_id in samples:
         hits_dict[sample_id] = {'buffer': [], 'countY': 0, 'countN': 0}
     # add containers for rejected read pairs
     hits_dict['bad_tags'] = {'buffer': [], 'countY': 0, 'countN': 0}
     hits_dict['bad_qual'] = {'buffer': [], 'countY': 0, 'countN': 0}
+    # initialize files
+    for sample_id in samples:
+        dmx_out = demux_root+sample_id+"_readpairs.txt"
+        open(dmx_out, 'w').write('')
+    open(demux_root+"bad_tags"+"_readpairs.txt", 'w').write('')
+    open(demux_root+"bad_qual"+"_readpairs.txt", 'w').write('')
     # iterate through reads
     pair_count = 0
     for titles, seqs, quals in FastqJointIterator(open(fwd_file),
@@ -276,9 +288,10 @@ def demux_illumina(dataset):
         # report on the progress
         if pair_count%100000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-        if pair_count == 1000000: # for inspection purposes
-            break
-    print "\t", "Counts per sample out of", pair_count, "total"
+#        if pair_count == 1000: # for inspection purposes
+#            break
+    print "\t", "Total", pair_count, "read pairs processed"
+    print "\t", "Counts per sample:"
     # prepare graphing data containers
     pcntY = []
     pcntN = []
@@ -289,39 +302,42 @@ def demux_illumina(dataset):
         dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
         hits_dict[sample_id]['buffer'] = []
         print "\t\t", sample_id, hits_dict[sample_id]['countY']
-        print "\nThis error message is ok to ignore:"
         pcntY.append(hits_dict[sample_id]['countY'])
         pcntN.append(hits_dict[sample_id]['countN'])
         sample_ids.append(sample_id)
         # generate FastQC report (use --noextract to not open zipped reports)
-        run_FastQC(dmx_out, report_root, '--quiet', ' ')
-        #print "QC report OK"
-    # write out whatever remains in the bad_tags buffer
-    dmx_out = demux_root+"bad_tags_readpairs.txt"
-    dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
-    hits_dict['bad_tags']['buffer'] = []
-    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],
-    # generate FastQC report (use --noextract to not open zipped reports)
-    run_FastQC(dmx_out, report_root, '--quiet', ' ')
-    print "\nThis error message is ok to ignore:"
-    #print "see QC report"
-    # add bad tags category for counts graphing (switch is on purpose)
-    pcntY.append(hits_dict['bad_tags']['countN'])
-    pcntN.append(hits_dict['bad_tags']['countY'])
-    sample_ids.append('bad_tags')
+        run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
+        #print "see QC report"
+        # add link in main QC file
+        line = "<ul><a href='"+qc_dir+sample_id+"_readpairs_fastqc/fastqc_report.html'>"+sample_id+"</a>: "+str(hits_dict[sample_id]['countY'])+" read pairs (not counting "+str(hits_dict[sample_id]['countN'])+" rejected due to poor sequence quality)</ul>"
+        open(qc_main_file, 'a').write(line)
     # write out whatever remains in the bad_qual buffer
     dmx_out = demux_root+"bad_qual_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_qual']['buffer'])
     hits_dict['bad_qual']['buffer'] = []
     print "\t\t", "rejected (low quality)", hits_dict['bad_qual']['countY']
     # generate FastQC report (use --noextract to not open zipped reports)
-    run_FastQC(dmx_out, report_root, '--quiet', ' ')
-    print "\nThis error message is ok to ignore:"
+    run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
-    # check that the totals add up
+    line = "<ul><a href='"+qc_dir+"bad_qual_readpairs_fastqc/fastqc_report.html'>bad_qual</a>: "+str(hits_dict['bad_qual']['countY'])+" total read pairs rejected after demultiplexing due to poor sequence quality</ul>"
+    open(qc_main_file, 'a').write(line)
+    # write out whatever remains in the bad_tags buffer
+    dmx_out = demux_root+"bad_tags_readpairs.txt"
+    dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
+    hits_dict['bad_tags']['buffer'] = []
+    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],
+    # generate FastQC report (use --noextract to not open zipped reports)
+    run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
+    #print "see QC report"
+    line = "<ul><a href='"+qc_dir+"bad_tags_readpairs_fastqc/fastqc_report.html'>bad_tags</a>: "+str(hits_dict['bad_tags']['countY'])+" could not be assigned to a sample due to mismatches in tag and/or primer</ul></li>"
+    open(qc_main_file, 'a').write(line)
+    # add bad tags category for counts graphing (switch is on purpose)
+    pcntY.append(hits_dict['bad_tags']['countN'])
+    pcntN.append(hits_dict['bad_tags']['countY'])
+    sample_ids.append('bad_tags')# check that the totals add up
     assert pair_count == sum(pcntY)+sum(pcntN)
     # plot the read counts per sample
     series = pcntY, pcntN
     legend = 'Accepted', 'Rejected'
     colors = 'g', 'r'
-    #two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
