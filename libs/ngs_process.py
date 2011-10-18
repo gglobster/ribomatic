@@ -2,7 +2,7 @@ from datetime import datetime
 from config import directories as dirs, rp_min_len
 from common import ensure_dir, key_by_value, dump_buffer
 from Bio.SeqIO.QualityIO import FastqGeneralIterator
-from graphics import two_storey_bar_chart
+from reporting import two_storey_bar_chart, run_FastQC
 
 def FastqGGIterator(handle):
     """Iterate over 2 Fastq records as string tuples.
@@ -155,8 +155,10 @@ def demux_illumina(dataset):
     fwd_file = ori_root+run_root+dataset['source_fwd']
     rev_file = ori_root+run_root+dataset['source_rev']
     demux_root = dirs['demux']+run_root
-    cnts_plot_name = dirs['reports']+run_root+"sample_counts"
+    report_root = dirs['reports']+run_root
+    cnts_plot_name = report_root+"sample_counts"
     ensure_dir(demux_root)
+    ensure_dir(report_root)
     print " ", run_id
     # prepare primers and barcodes info
     primers = dataset['primers']
@@ -265,7 +267,7 @@ def demux_illumina(dataset):
         # increment sample 'Yes' hit counter
         hits_dict[sample_id]['countY'] +=1
         # when buffer capacity is reached, output to file and reset buffer
-        if hits_dict[sample_id]['counter']% 10000==0:
+        if hits_dict[sample_id]['countY']% 10000==0:
             dmx_out = demux_root+sample_id+"_readpairs.txt"
             dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
             hits_dict[sample_id]['buffer'] = []
@@ -287,14 +289,22 @@ def demux_illumina(dataset):
         dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
         hits_dict[sample_id]['buffer'] = []
         print "\t\t", sample_id, hits_dict[sample_id]['countY']
+        print "\nThis error message is ok to ignore:"
         pcntY.append(hits_dict[sample_id]['countY'])
         pcntN.append(hits_dict[sample_id]['countN'])
         sample_ids.append(sample_id)
+        # generate FastQC report (use --noextract to not open zipped reports)
+        run_FastQC(dmx_out, report_root, '--quiet', ' ')
+        #print "QC report OK"
     # write out whatever remains in the bad_tags buffer
     dmx_out = demux_root+"bad_tags_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
     hits_dict['bad_tags']['buffer'] = []
-    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY']
+    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],
+    # generate FastQC report (use --noextract to not open zipped reports)
+    run_FastQC(dmx_out, report_root, '--quiet', ' ')
+    print "\nThis error message is ok to ignore:"
+    #print "see QC report"
     # add bad tags category for counts graphing (switch is on purpose)
     pcntY.append(hits_dict['bad_tags']['countN'])
     pcntN.append(hits_dict['bad_tags']['countY'])
@@ -304,10 +314,14 @@ def demux_illumina(dataset):
     dump_buffer(dmx_out, hits_dict['bad_qual']['buffer'])
     hits_dict['bad_qual']['buffer'] = []
     print "\t\t", "rejected (low quality)", hits_dict['bad_qual']['countY']
+    # generate FastQC report (use --noextract to not open zipped reports)
+    run_FastQC(dmx_out, report_root, '--quiet', ' ')
+    print "\nThis error message is ok to ignore:"
+    #print "see QC report"
     # check that the totals add up
     assert pair_count == sum(pcntY)+sum(pcntN)
     # plot the read counts per sample
     series = pcntY, pcntN
     legend = 'Accepted', 'Rejected'
     colors = 'g', 'r'
-    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+    #two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
