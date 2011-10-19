@@ -256,7 +256,7 @@ def demux_illumina(dataset):
             else:
                 F_seq = F_seq[F_clip:]
                 F_qual = F_qual[F_clip:]
-            R_trim = R_qual[R_clip:].find('BB')
+            R_trim = R_qual[R_clip:].find('##')
             if R_trim > -1:
                 R_seq = R_seq[R_clip:R_clip+R_trim]
                 R_qual = R_qual[R_clip:R_clip+R_trim]
