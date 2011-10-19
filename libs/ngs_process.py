@@ -288,8 +288,8 @@ def demux_illumina(dataset):
         # report on the progress
         if pair_count%100000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-#        if pair_count == 1000: # for inspection purposes
-#            break
+        if pair_count == 1000: # for inspection purposes
+            break
     print "\t", "Total", pair_count, "read pairs processed"
     print "\t", "Counts per sample:"
     # prepare graphing data containers
