@@ -6,7 +6,7 @@ import numpy
 ## Data identification
 datasets = [{'source_fwd': 'Novophage5_1_sequence.txt',
              'source_rev': 'Novophage5_2_sequence.txt',
-             'run_id': 'test',#'Novophage5',
+             'run_id': 'Novophage5', #'test',#
              'date': '9-22-11',
              'primers': {'fwdRA': 'caacgcgaAgaaccttacc', # workaround for R
                          'fwdRG': 'caacgcgaGgaaccttacc',
@@ -34,6 +34,7 @@ root_dir = 'test_data/'
 directories = {
 'ori_data': root_dir+'original/',      # original data
 'demux': root_dir+'demux/',            # combined fwd/rev read sets
+'merged': root_dir+'merged/',          # merged read pairs
 
 'blast_db': root_dir+'blast_db/',      # blast databases
 'reports': root_dir+'reports/'         # reports

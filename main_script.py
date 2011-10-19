@@ -1,6 +1,6 @@
 from sys import argv, exit
 from libs.common import ensure_dir
-from libs.ngs_process import demux_illumina
+from libs.ngs_process import demux_illumina, merge_pair_libs
 from config import datasets, directories
 
 print "\n", \
@@ -33,5 +33,12 @@ if step is 1:
         demux_illumina(dataset)
     step +=1
 
-if step > 2:
+if step is 2:
+    ### STEP 2: Merge read pairs ###
+    print "\n###", step, ". Merge read pairs ###"
+    for dataset in datasets:
+        merge_pair_libs(dataset)
+    step +=1
+
+if step > 3:
     print "\n### Nothing more to do! ###\n"

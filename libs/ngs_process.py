@@ -1,8 +1,8 @@
 from datetime import datetime
 from config import directories as dirs, rp_min_len
 from common import ensure_dir, key_by_value, dump_buffer
-from Bio.SeqIO.QualityIO import FastqGeneralIterator
 from reporting import two_storey_bar_chart, run_FastQC
+from seq_methods import merge_overlaps
 
 def FastqGGIterator(handle):
     """Iterate over 2 Fastq records as string tuples.
@@ -249,7 +249,7 @@ def demux_illumina(dataset):
             sample_id = 'bad_tags'
         # for matched read pairs, clip off tag+primer and strip low qual runs
         else:
-            F_trim = F_qual[F_clip:].find('BB')
+            F_trim = F_qual[F_clip:].find('##')
             if F_trim > -1:
                 F_seq = F_seq[F_clip:F_clip+F_trim]
                 F_qual = F_qual[F_clip:F_clip+F_trim]
@@ -288,7 +288,7 @@ def demux_illumina(dataset):
         # report on the progress
         if pair_count%100000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-        if pair_count == 1000: # for inspection purposes
+        if pair_count == 100000: # for inspection purposes
             break
     print "\t", "Total", pair_count, "read pairs processed"
     print "\t", "Counts per sample:"
@@ -340,4 +340,57 @@ def demux_illumina(dataset):
     series = pcntY, pcntN
     legend = 'Accepted', 'Rejected'
     colors = 'g', 'r'
-    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+    #two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+
+def merge_pair_libs(dataset):
+    """Merge read pairs from Illumina sample libs and output FastA."""
+    # identify inputs and outputs
+    samples = dataset['samples']
+    run_id = dataset['run_id']
+    dmx_root = dirs['demux']+run_id+"/"
+    merged_root = dirs['merged']+run_id+"/"
+    ensure_dir(merged_root)
+    print " ", run_id
+    # merge per sample (demuxed)
+    for sample_id in samples:
+        print "\t", sample_id,
+        lib_file = dmx_root+sample_id+"_readpairs.txt"
+        merge_out = merged_root+sample_id+"_merged.fas"
+        open(merge_out, 'w').write('')
+        # prepare container and files for output batching and reporting
+        buffer = []
+        countY = 0
+        countF = 0
+        countN = 0
+        # iterate through the read pairs
+        count = 0
+        for titles, seqs, quals in FastqGGIterator(open(lib_file)):
+            count +=1
+            seq1 = seqs[0]
+            seq2 = seqs[1]
+            qual1 = quals[0]
+            qual2 = quals[1]
+            # merge reads   TODO: better safeguard against merge failure
+            try: merged = merge_overlaps(seq1, qual1, seq2, qual2)
+            except: countF +=1
+            else:
+                if merged.find('N') > -1:
+                    countN +=1  # if there are still N quality must be too low
+                else:
+                    countY +=1
+                    # compose string for output
+                    mcomps = [">", sample_id, "_", str(count), "\n", merged, "\n"]
+                    mstring = "".join(mcomps)
+                    # output to buffer
+                    buffer.append(mstring)
+            # when buffer capacity is reached, output to file and reset buffer
+            if countY % 10000==0:
+                dump_buffer(merge_out, buffer)
+                buffer = []
+        # write out whatever remains in the buffer
+        dump_buffer(merge_out, buffer)
+        assert countY+countF+countN == count
+        print count, "pairs"
+        print "\t\t", countY, "merged and accepted"
+        print "\t\t", countN, "merged but rejected due to residual Ns"
+        print "\t\t", countF, "failed to merge"

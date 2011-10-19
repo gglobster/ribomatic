@@ -1,3 +1,5 @@
+import nwalign as nw
+
 def merge_overlaps(seq1, qual1, seq2, qual2):
     """Merge two sequences that overlap at the ends.
 
@@ -10,29 +12,51 @@ def merge_overlaps(seq1, qual1, seq2, qual2):
     >>> ord('B')
     66
 
-    The alignment is done by iteratively scoring overlap configurations
-    starting with a start-to-start case then pushing the second sequence
-    further down along the first. Alignment is stopped and considered
-    successful when the score is above 97% identity. If this point is not
-    reached, uhhhhh. Not sure yet. We'll see.
+    The alignment is done using the nwalign package which implements the
+    Needleman-Wunsch algorithm in C via Cython.
 
     """
     # reverse-complement the second sequence
+    seq1 = seq1.upper()     # to make sure
     seq2 = quick_revcom(seq2)
-    # starting point and iterations depend on relative lengths
-    if len(seq1) <= len(seq2):
-        start = 0
-        iter_max = len(seq1)
-    else :
-        start = len(seq1)-len(seq2)
-        iter_max = len(seq2)
-    iter_count = 0
-    while iter_count < iter_max:
-        print 'flebelebeleb'
-        iter_count +=1
+    qual2 = qual2[::-1]
+    # run the alignment
+    alignment = nw.global_align(seq1, seq2, gap_open=-50, gap_extend=-2)
+    seqln1 = alignment[0]
+    seqln2 = alignment[1]
+    # compose the merged sequence
+    merge_list = []
+    pos = 0
+    qpos1 = 0
+    qpos2 = 0
+    while pos < len(alignment[0]):
+        if seqln1[pos] is '-' or seqln1[pos] is 'N':
+            merge_list.append(seqln2[pos])
+            qpos1 +=1
+        elif seqln2[pos] is '-' or seqln2[pos] is 'N':
+            merge_list.append(seqln1[pos])
+            qpos2 +=1
+        elif seqln1[pos] is seqln2[pos]:
+            merge_list.append(seqln1[pos])
+        else:  # determine the consensus of the overlap using quality scores
+            if ord(qual1[qpos1]) >= ord(qual2[qpos2]):
+                merge_list.append(seqln1[pos])
+            else:
+                merge_list.append(seqln2[pos])
+        pos +=1
+        qpos1 +=1
+        qpos2 +=1
+    merged_seq = ''.join(merge_list)
+    return merged_seq
+        
 
 def quick_revcom(seq):
-    """Take the DNA reverse complement of a sequence."""
+    """Return the reverse complement of a DNA sequence.
+
+    This is a low-overhead method for when we don't want to be dealing with
+    the Bio package's feature-rich Seq objects.
+
+    """
     rc_seq_temp = []
     for base in seq[::-1]:  # reverse
         if base is 'A':
@@ -43,5 +67,7 @@ def quick_revcom(seq):
             rc_seq_temp.append('C')
         elif base is 'C':
             rc_seq_temp.append('G')
+        else:
+            rc_seq_temp.append('N')
     rc_seq = ''.join(rc_seq_temp)
     return rc_seq
