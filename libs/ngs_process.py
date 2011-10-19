@@ -279,17 +279,17 @@ def demux_illumina(dataset):
         # increment sample 'Yes' hit counter
         hits_dict[sample_id]['countY'] +=1
         # when buffer capacity is reached, output to file and reset buffer
-        if hits_dict[sample_id]['countY']% 10000==0:
+        if hits_dict[sample_id]['countY']% 100000==0:
             dmx_out = demux_root+sample_id+"_readpairs.txt"
             dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
             hits_dict[sample_id]['buffer'] = []
         # increment counter
         pair_count +=1
         # report on the progress
-        if pair_count%100000==0:
+        if pair_count%1000000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-        if pair_count == 100000: # for inspection purposes
-            break
+#        if pair_count == 100000: # for inspection purposes
+#            break
     print "\t", "Total", pair_count, "read pairs processed"
     print "\t", "Counts per sample:"
     # prepare graphing data containers
@@ -340,7 +340,7 @@ def demux_illumina(dataset):
     series = pcntY, pcntN
     legend = 'Accepted', 'Rejected'
     colors = 'g', 'r'
-    #two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
 
 def merge_pair_libs(dataset):
     """Merge read pairs from Illumina sample libs and output FastA."""
@@ -384,7 +384,7 @@ def merge_pair_libs(dataset):
                     # output to buffer
                     buffer.append(mstring)
             # when buffer capacity is reached, output to file and reset buffer
-            if countY % 10000==0:
+            if countY % 100000==0:
                 dump_buffer(merge_out, buffer)
                 buffer = []
         # write out whatever remains in the buffer
