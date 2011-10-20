@@ -1,6 +1,8 @@
 from sys import argv, exit
 from libs.common import ensure_dir
 from libs.ngs_process import demux_illumina, merge_pair_libs
+from libs.run_qiime import pick_otus, pick_rep_set, assign_taxonomy, \
+    make_otu_table
 from config import datasets, directories
 
 print "\n", \
@@ -15,30 +17,45 @@ if len(argv) > 1 and argv[1] == '-h':
     exit()
 
 if len(argv) < 2:
-    step = 0
+    step = 1
 else:
     step = int(argv[1])
 
-if step is 0:
-    ### STEP 0: Ensure that all base directories exist ###
-    print "\n###", step, ". Set up the work environment ###"
-    for dir_name in directories.keys():
-        ensure_dir(directories[dir_name])
-    step +=1
-
 if step is 1:
-    ### STEP 1: Demux Illumina read sets ###
     print "\n###", step, ". Demultiplex Illumina read sets ###"
     for dataset in datasets:
         demux_illumina(dataset)
     step +=1
 
 if step is 2:
-    ### STEP 2: Merge read pairs ###
     print "\n###", step, ". Merge read pairs ###"
     for dataset in datasets:
         merge_pair_libs(dataset)
     step +=1
 
-if step > 3:
+if step is 3:
+    print "\n###", step, ". Cluster sequences into OTUs ###"
+    for dataset in datasets:
+        pick_otus(dataset)
+    step +=1
+
+if step is 4:
+    print "\n###", step, ". Pick representative OTUs ###"
+    for dataset in datasets:
+        pick_rep_set(dataset)
+    step +=1
+
+if step is 5:
+    print "\n###", step, ". Assign taxonomy to representative OTUs ###"
+    for dataset in datasets:
+        assign_taxonomy(dataset)
+    step +=1
+
+if step is 6:
+    print "\n###", step, ". Make OTU table ###"
+    for dataset in datasets:
+        make_otu_table(dataset)
+    step +=1
+
+if step > 7:
     print "\n### Nothing more to do! ###\n"

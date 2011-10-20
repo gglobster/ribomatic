@@ -1,5 +1,5 @@
 from datetime import datetime
-from config import directories as dirs, rp_min_len
+from config import root_dir, directories as dirs, rp_min_len
 from common import ensure_dir, key_by_value, dump_buffer
 from reporting import two_storey_bar_chart, run_FastQC
 from seq_methods import merge_overlaps
@@ -9,7 +9,6 @@ def FastqGGIterator(handle):
 
     Modified from Bio.SeqIO.QualityIO import FastqGeneralIterator to return
     two reads at a time.
-
     """
     handle_readline = handle.readline
     while True:
@@ -66,7 +65,6 @@ def FastqJointIterator(handleA, handleB):
     Modified from Bio.SeqIO.QualityIO import FastqGeneralIterator to read
     from two separate files in parallel. Useful for shuffle-combining
     Illumina read sets.
-
     """
     handleA_readline = handleA.readline
     handleB_readline = handleB.readline
@@ -146,19 +144,20 @@ def demux_illumina(dataset):
     to separate files for each sample based on barcode tags. As part of the
     process, reject read pairs that have mismatching tags or primers and trim
     the rest, removing primer+tag and low-quality sequences.
-
     """
     # identify inputs and outputs
     run_id = dataset['run_id']
-    ori_root = dirs['ori_data']
-    run_root = run_id+"/"
-    fwd_file = ori_root+run_root+dataset['source_fwd']
-    rev_file = ori_root+run_root+dataset['source_rev']
-    demux_root = dirs['demux']+run_root
-    report_root = dirs['reports']+run_root
+    print " ", run_id
+    run_root = root_dir+run_id+"/"
+    ori_root = run_root+dirs['master']
+    fwd_file = ori_root+dataset['source_fwd']
+    rev_file = ori_root+dataset['source_rev']
+    demux_root = run_root+dirs['demux']
+    report_root = run_root+dirs['reports']
     qc_dir = "qc_details/"
     qc_main_file = report_root+"quality_control.html"
     cntsplt = report_root+"sample_counts"
+    ensure_dir(ori_root)
     ensure_dir(demux_root)
     ensure_dir(report_root)
     ensure_dir(report_root+qc_dir)
@@ -173,7 +172,6 @@ def demux_illumina(dataset):
                   "<th>% OK</th></tr>"]
     html_block = "".join(html_comps)
     open(qc_main_file, 'w').write(html_block)
-    print " ", run_id
     # prepare primers and barcodes info
     primers = dataset['primers']
     samples = dataset['samples']
@@ -296,8 +294,8 @@ def demux_illumina(dataset):
         # report on the progress
         if pair_count%1000000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-#        if pair_count == 100000: # for inspection purposes
-#            break
+        if pair_count == 1000: # for inspection purposes
+            break
     print "\t", "Total", pair_count, "read pairs processed"
     print "\t", "Counts per sample:"
     # prepare graphing data containers
@@ -311,7 +309,7 @@ def demux_illumina(dataset):
         hits_dict[sample_id]['buffer'] = []
         acc = hits_dict[sample_id]['countY']
         rej = hits_dict[sample_id]['countN']
-        print "\t\t", sample_id, acc
+        print "\t\t", sample_id, acc, "pairs", datetime.now()
         pcntY.append(acc)
         pcntN.append(rej)
         sample_ids.append(sample_id)
@@ -333,7 +331,8 @@ def demux_illumina(dataset):
     dmx_out = demux_root+"bad_qual_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_qual']['buffer'])
     hits_dict['bad_qual']['buffer'] = []
-    print "\t\t", "rejected (low quality)", hits_dict['bad_qual']['countY']
+    print "\t\t", "rejected (low quality)", hits_dict['bad_qual']['countY'],\
+    datetime.now()
     # generate FastQC report (use --noextract to not open zipped reports)
     run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
@@ -351,7 +350,8 @@ def demux_illumina(dataset):
     dmx_out = demux_root+"bad_tags_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
     hits_dict['bad_tags']['buffer'] = []
-    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],
+    print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],\
+    datetime.now() 
     # generate FastQC report (use --noextract to not open zipped reports)
     run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
@@ -390,15 +390,18 @@ def demux_illumina(dataset):
 def merge_pair_libs(dataset):
     """Merge read pairs from Illumina sample libs and output FastA."""
     # identify inputs and outputs
-    samples = dataset['samples']
     run_id = dataset['run_id']
-    dmx_root = dirs['demux']+run_id+"/"
-    merged_root = dirs['merged']+run_id+"/"
-    report_root = dirs['reports']+run_id+"/"
+    print " ", run_id
+    run_root = root_dir+run_id+"/"
+    dmx_root = run_root+dirs['demux']
+    merged_root = run_root+dirs['merged']
+    report_root = run_root+dirs['reports']
+    master_file = run_root+dirs['master']+run_id+".fas"
     ensure_dir(merged_root)
     ensure_dir(report_root)
     merger_file = report_root+"merged_pairs.html"
     cntsplt = report_root+"merge_counts"
+    samples = dataset['samples']
     # set up files for reporting
     html_comps = ["<p><b>Read pairs merged for run ", run_id, "</b></p>",
                   "<p><img src='merge_counts.png' alt='merge_counts'/></p>",
@@ -410,7 +413,8 @@ def merge_pair_libs(dataset):
                   "<th>% OK</th></tr>"]
     html_block = "".join(html_comps)
     open(merger_file, 'w').write(html_block)
-    print " ", run_id
+    # initialize master file
+    open(master_file, 'w').write('')
     # merge per sample (demuxed)
     merge_countA = []
     merge_countR = []
@@ -449,12 +453,14 @@ def merge_pair_libs(dataset):
             # when buffer capacity is reached, output to file and reset buffer
             if countY % 10000==0:
                 dump_buffer(merge_out, buffer)
+                dump_buffer(master_file, buffer)
                 buffer = []
         # write out whatever remains in the buffer
         dump_buffer(merge_out, buffer)
+        dump_buffer(master_file, buffer)
         # sum up
         assert countY+countF+countN == count
-        print count, "pairs"
+        print count, "pairs", datetime.now()
         print "\t\t", str(countY), "merged and accepted"
         print "\t\t", str(countN), "merged but rejected due to residual Ns"
         print "\t\t", str(countF), "failed to merge"

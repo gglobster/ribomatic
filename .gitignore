@@ -5,4 +5,8 @@
 
 test_data/*
 test_data/**
+
+data/*
+data/**
+
 libs/ngs_process.pyc
