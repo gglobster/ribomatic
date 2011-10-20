@@ -158,13 +158,21 @@ def demux_illumina(dataset):
     report_root = dirs['reports']+run_root
     qc_dir = "qc_details/"
     qc_main_file = report_root+"quality_control.html"
-    cnts_plot_name = report_root+"sample_counts"
+    cntsplt = report_root+"sample_counts"
     ensure_dir(demux_root)
     ensure_dir(report_root)
     ensure_dir(report_root+qc_dir)
     # set up files for reporting
-    open(qc_main_file, 'w').write("<p><b>Quality control for run "+run_id+"</b></p>")
-    open(qc_main_file, 'a').write("<p><img src='sample_counts.png' alt='sample_counts'/></p>")
+    html_comps = ["<p><b>Quality control for run "+run_id+"</b></p>",
+                  "<p><img src='sample_counts.png' alt='sample_counts'/></p>",
+                  "<p><table border='1'><tr>",
+                  "<th>Sample</th>",
+                  "<th>Accepted</th>",
+                  "<th>Rejected</th>",
+                  "<th>Total</th>",
+                  "<th>% OK</th></tr>"]
+    html_block = "".join(html_comps)
+    open(qc_main_file, 'w').write(html_block)
     print " ", run_id
     # prepare primers and barcodes info
     primers = dataset['primers']
@@ -301,16 +309,26 @@ def demux_illumina(dataset):
         dmx_out = demux_root+sample_id+"_readpairs.txt"
         dump_buffer(dmx_out, hits_dict[sample_id]['buffer'])
         hits_dict[sample_id]['buffer'] = []
-        print "\t\t", sample_id, hits_dict[sample_id]['countY']
-        pcntY.append(hits_dict[sample_id]['countY'])
-        pcntN.append(hits_dict[sample_id]['countN'])
+        acc = hits_dict[sample_id]['countY']
+        rej = hits_dict[sample_id]['countN']
+        print "\t\t", sample_id, acc
+        pcntY.append(acc)
+        pcntN.append(rej)
         sample_ids.append(sample_id)
         # generate FastQC report (use --noextract to not open zipped reports)
         run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
         #print "see QC report"
-        # add link in main QC file
-        line = "<ul><a href='"+qc_dir+sample_id+"_readpairs_fastqc/fastqc_report.html'>"+sample_id+"</a>: "+str(hits_dict[sample_id]['countY'])+" read pairs (not counting "+str(hits_dict[sample_id]['countN'])+" rejected due to poor sequence quality)</ul>"
-        open(qc_main_file, 'a').write(line)
+        # add line in QC file
+        link = qc_dir+sample_id+"_readpairs_fastqc/fastqc_report.html"
+        html_comps = ["<tr>",
+                      "<th><a href='"+link+"'>"+sample_id+"</a></th>",
+                      "<td>", str(acc), "</td>",
+                      "<td>", str(rej), "</td>",
+                      "<td>", str(acc+rej), "</td>",
+                      "<td>", str(int((float(acc)/(acc+rej))*100)), 
+                      "</td></tr>"]
+        html_block = "".join(html_comps)
+        open(qc_main_file, 'a').write(html_block)
     # write out whatever remains in the bad_qual buffer
     dmx_out = demux_root+"bad_qual_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_qual']['buffer'])
@@ -319,8 +337,16 @@ def demux_illumina(dataset):
     # generate FastQC report (use --noextract to not open zipped reports)
     run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
-    line = "<ul><a href='"+qc_dir+"bad_qual_readpairs_fastqc/fastqc_report.html'>bad_qual</a>: "+str(hits_dict['bad_qual']['countY'])+" total read pairs rejected after demultiplexing due to poor sequence quality</ul>"
-    open(qc_main_file, 'a').write(line)
+    # add line in QC file
+    link = qc_dir+"bad_qual_readpairs_fastqc/fastqc_report.html"
+    html_comps = ["<tr>",
+                  "<th><a href='"+link+"'>"+"bad_qual"+"</a></th>",
+                  "<td>", '0', "</td>",
+                  "<td>", str(hits_dict['bad_qual']['countY']), "</td>",
+                  "<td>", str(hits_dict['bad_qual']['countY']), "</td>",
+                  "<td>", '0',"</td></tr>"]
+    html_block = "".join(html_comps)
+    open(qc_main_file, 'a').write(html_block)
     # write out whatever remains in the bad_tags buffer
     dmx_out = demux_root+"bad_tags_readpairs.txt"
     dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
@@ -329,8 +355,26 @@ def demux_illumina(dataset):
     # generate FastQC report (use --noextract to not open zipped reports)
     run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
-    line = "<ul><a href='"+qc_dir+"bad_tags_readpairs_fastqc/fastqc_report.html'>bad_tags</a>: "+str(hits_dict['bad_tags']['countY'])+" could not be assigned to a sample due to mismatches in tag and/or primer</ul></li>"
-    open(qc_main_file, 'a').write(line)
+    # add line in QC file
+    link = qc_dir+"bad_tags_readpairs_fastqc/fastqc_report.html"
+    html_comps = ["<tr>",
+                  "<th><a href='"+link+"'>"+"bad_tags"+"</a></th>",
+                  "<td>", '0', "</td>",
+                  "<td>", str(hits_dict['bad_tags']['countY']), "</td>",
+                  "<td>", str(hits_dict['bad_tags']['countY']), "</td>",
+                  "<td>", '0',"</td></tr>"]
+    html_block = "".join(html_comps)
+    open(qc_main_file, 'a').write(html_block)
+    # close table and add notes
+    line_bq = "rejected after demultiplexing due to low sequence quality \
+    (top stacks in bar chart)"
+    line_bt = "could not be assigned to a sample due to mismatches in tag \
+    and/or primer"
+    html_comps = ["</table></p>",
+                  "<p><b>", "bad_qual", ": </b>", line_bq,
+                  "<br><b>", "bad_tags", ": </b>", line_bt, "</p>",]
+    html_block = "".join(html_comps)
+    open(qc_main_file, 'a').write(html_block)
     # add bad tags category for counts graphing (switch is on purpose)
     pcntY.append(hits_dict['bad_tags']['countN'])
     pcntN.append(hits_dict['bad_tags']['countY'])
@@ -340,7 +384,8 @@ def demux_illumina(dataset):
     series = pcntY, pcntN
     legend = 'Accepted', 'Rejected'
     colors = 'g', 'r'
-    two_storey_bar_chart(series, sample_ids, legend, colors, cnts_plot_name)
+    titles = 'Number of read pairs', 'Read pairs per sample'
+    two_storey_bar_chart(series, sample_ids, legend, colors, cntsplt, titles)
 
 def merge_pair_libs(dataset):
     """Merge read pairs from Illumina sample libs and output FastA."""
@@ -349,10 +394,28 @@ def merge_pair_libs(dataset):
     run_id = dataset['run_id']
     dmx_root = dirs['demux']+run_id+"/"
     merged_root = dirs['merged']+run_id+"/"
+    report_root = dirs['reports']+run_id+"/"
     ensure_dir(merged_root)
+    ensure_dir(report_root)
+    merger_file = report_root+"merged_pairs.html"
+    cntsplt = report_root+"merge_counts"
+    # set up files for reporting
+    html_comps = ["<p><b>Read pairs merged for run ", run_id, "</b></p>",
+                  "<p><img src='merge_counts.png' alt='merge_counts'/></p>",
+                  "<p><table border='1'><tr>",
+                  "<th>Sample</th>",
+                  "<th>Accepted</th>",
+                  "<th>Rejected</th>",
+                  "<th>Total</th>",
+                  "<th>% OK</th></tr>"]
+    html_block = "".join(html_comps)
+    open(merger_file, 'w').write(html_block)
     print " ", run_id
     # merge per sample (demuxed)
-    for sample_id in samples:
+    merge_countA = []
+    merge_countR = []
+    sample_ids = samples.keys()
+    for sample_id in sample_ids:
         print "\t", sample_id,
         lib_file = dmx_root+sample_id+"_readpairs.txt"
         merge_out = merged_root+sample_id+"_merged.fas"
@@ -379,18 +442,45 @@ def merge_pair_libs(dataset):
                 else:
                     countY +=1
                     # compose string for output
-                    mcomps = [">", sample_id, "_", str(count), "\n", merged, "\n"]
+                    mcomps = [">",sample_id,"_",str(count),"\n",merged,"\n"]
                     mstring = "".join(mcomps)
                     # output to buffer
                     buffer.append(mstring)
             # when buffer capacity is reached, output to file and reset buffer
-            if countY % 100000==0:
+            if countY % 10000==0:
                 dump_buffer(merge_out, buffer)
                 buffer = []
         # write out whatever remains in the buffer
         dump_buffer(merge_out, buffer)
+        # sum up
         assert countY+countF+countN == count
         print count, "pairs"
-        print "\t\t", countY, "merged and accepted"
-        print "\t\t", countN, "merged but rejected due to residual Ns"
-        print "\t\t", countF, "failed to merge"
+        print "\t\t", str(countY), "merged and accepted"
+        print "\t\t", str(countN), "merged but rejected due to residual Ns"
+        print "\t\t", str(countF), "failed to merge"
+        # add line in QC file
+        html_comps = ["<tr>",
+                      "<th>", sample_id, "</b></th>",
+                      "<td>", str(countY), "</td>",
+                      "<td>", str(countN + countF), "</td>",
+                      "<td>", str(count), "</td>",
+                      "<td>", str(int((float(countY)/count)*100)),
+                      "</td></tr>"]
+        html_block = "".join(html_comps)
+        open(merger_file, 'a').write(html_block)
+        # pass values
+        merge_countA.append(countY)
+        merge_countR.append(countN+countF)
+    # close table and add notes
+    line_N = "either failed to merge or still contained Ns after merging"
+    html_comps = ["</table></p>",
+                  "<p><b>", "Rejected", ":</b> ", line_N, "</p>"]
+    html_block = "".join(html_comps)
+    open(merger_file, 'a').write(html_block)
+    # plot the read counts per sample
+    series = merge_countA, merge_countR
+    lgnd = 'Accepted', 'Rejected'
+    colors = 'g', 'r'
+    titles = 'Number of read pairs', 'Read pairs merged per sample'
+    two_storey_bar_chart(series, sample_ids, lgnd, colors, cntsplt, titles)
+    
