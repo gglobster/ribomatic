@@ -25,3 +25,8 @@ def run_FastQC(infile, outdir, quietness, unzip):
     child = subprocess.Popen(str(cline), stdout=subprocess.PIPE, shell=True)
     output, error = child.communicate()
     return output
+
+def make_final_report(dataset):
+    """Make final report HTML file."""
+    # identify inputs and outputs
+    

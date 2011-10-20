@@ -2,7 +2,8 @@ from sys import argv, exit
 from libs.common import ensure_dir
 from libs.ngs_process import demux_illumina, merge_pair_libs
 from libs.run_qiime import pick_otus, pick_rep_set, assign_taxonomy, \
-    make_otu_table
+    make_otu_table, make_qiime_reports
+from libs.reporting import make_final_report
 from config import datasets, directories
 
 print "\n", \
@@ -52,9 +53,21 @@ if step is 5:
     step +=1
 
 if step is 6:
-    print "\n###", step, ". Make OTU table ###"
+    print "\n###", step, ". Make OTU table###"
     for dataset in datasets:
         make_otu_table(dataset)
+    step +=1
+
+if step is 7:
+    print "\n###", step, ". Generate community analysis reports ###"
+    for dataset in datasets:
+        make_qiime_reports(dataset)
+    step +=1
+
+if step is 8:
+    print "\n###", step, ". Compile final report ###"
+    for dataset in datasets:
+        make_final_report(dataset)
     step +=1
 
 if step > 7:
