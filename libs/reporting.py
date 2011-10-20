@@ -39,8 +39,8 @@ def make_final_report(dataset):
     comms_dir = report_root+"communities/"
     final_report_file = run_root+run_id+"_report.html"
     # component links
-    fqc_link = ''
-    qiime_link = ''
+    fqc_link = "http://www.bioinformatics.bbsrc.ac.uk/projects/fastqc/"
+    qiime_link = "http://qiime.org"
     master_file = run_root+dirs['master']+run_id+".fas"
     qc_link = report_root+"quality_control.html"
     merge_link = report_root+"merged_pairs.html"
