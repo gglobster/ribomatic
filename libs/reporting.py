@@ -33,15 +33,15 @@ def make_final_report(dataset):
     # identify directories
     run_id = dataset['run_id']
     print " ", run_id
-    run_root = root_dir+run_id+"/"
-    report_root = run_root+dirs['reports']
+    run_root = run_id+"/"
+    report_root = dirs['reports']
     heatmap_dir = report_root+"otu_heatmap/"
     comms_dir = report_root+"communities/"
-    final_report_file = run_root+run_id+"_report.html"
+    final_report_file = root_dir+run_root+run_id+"_report.html"
     # component links
     fqc_link = "http://www.bioinformatics.bbsrc.ac.uk/projects/fastqc/"
     qiime_link = "http://qiime.org"
-    master_file = run_root+dirs['master']+run_id+".fas"
+    master_file = dirs['master']+run_id+".fas"
     qc_link = report_root+"quality_control.html"
     merge_link = report_root+"merged_pairs.html"
     stats_link = report_root+run_id+"_otu_table_stats.txt"
@@ -53,9 +53,9 @@ def make_final_report(dataset):
                   "<p>Date compiled: "+str(datetime.now())+"</p>",
                   "<p>External components of the pipeline:<br><ul>",
                   "<li><a href='", fqc_link, "'>FastQC</a></li>",
-                  "<li><a href='", qiime_link, "'>FastQC</a></li></ul></p>",
+                  "<li><a href='", qiime_link, "'>Qiime</a></li></ul></p>",
                   "<p>Master file of final 16S sequences:<br><ul>",
-                  "<li><a href='", master_file, "'>"+run_id+".fas</a></li>",
+                  "<li><a href='", master_file, "'>"+run_id+".fas</a></li></ul></p>",
                   "<p>Report files:<br><ul>",
                   "<li><a href='", qc_link, "'>Quality control</a></li>",
                   "<li><a href='", merge_link, "'>Pair merging</a></li>",
