@@ -70,10 +70,11 @@ def make_otu_table(dataset):
     print " ", run_id
     run_root = root_dir+run_id+"/"
     otus_dir = run_root+dirs['otus']
+    report_root = run_root+dirs['reports']
     otus_file = otus_dir+run_id+"_otus.txt"
     tax_ass_file = otus_dir+run_id+"_rep_set_tax_assignments.txt"
     table_file = otus_dir+run_id+"_otu_table.txt"
-    stats_file = otus_dir+run_id+"_otu_table_stats.txt"
+    stats_file = report_root+run_id+"_otu_table_stats.txt"
     # run the command
     comps = ["macqiime", "make_otu_table.py", "-i", otus_file,
              "-t", tax_ass_file, "-o", table_file]
