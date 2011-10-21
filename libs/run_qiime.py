@@ -4,15 +4,15 @@ from common import ensure_dir
 
 # TODO: adapt cline to run with the regular CLI qiime binary (here=macqiime)
 
-def pick_otus(dataset):
+def pick_otus(dataset, run_id):
     """Pick OTUs using Uclust with Qiime."""
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     otus_dir = run_root+dirs['otus']
     ensure_dir(otus_dir)
-    master_file = run_root+dirs['master']+run_id+".fas"
+    master_file = run_root+dirs['merged']+run_id+".fas"
     # run the command
     comps = ["macqiime", "pick_otus.py", "-i", master_file, "-o", otus_dir]
     cline = " ".join(comps)
@@ -23,14 +23,14 @@ def pick_otus(dataset):
     except: raise
     else: print "\t", "OTUs picked"
 
-def pick_rep_set(dataset):
+def pick_rep_set(dataset, run_id):
     """Pick representative set of OTUs with Qiime."""
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     otus_dir = run_root+dirs['otus']
-    master_file = run_root+dirs['master']+run_id+".fas"
+    master_file = run_root+dirs['merged']+run_id+".fas"
     otus_file = otus_dir+run_id+"_otus.txt"
     rep_otus_file = otus_dir+run_id+"_rep_set.fas"
     # run the command
@@ -44,12 +44,12 @@ def pick_rep_set(dataset):
     except: raise
     else: print "\t", "OTUs representative set selected"
 
-def assign_taxonomy(dataset):
+def assign_taxonomy(dataset, run_id):
     """Assign taxonomy to representative OTUs using RDP with Qiime."""
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     otus_dir = run_root+dirs['otus']
     rep_otus_file = otus_dir+run_id+"_rep_set.fas"
     # run the command
@@ -63,12 +63,12 @@ def assign_taxonomy(dataset):
     except: raise
     else: print "\t", "Taxonomy assigned to representative OTUs"
 
-def make_otu_table(dataset):
+def make_otu_table(dataset, run_id):
     """Make table of OTUs and summarize sample statistics with Qiime."""
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     otus_dir = run_root+dirs['otus']
     report_root = run_root+dirs['reports']
     otus_file = otus_dir+run_id+"_otus.txt"
@@ -97,16 +97,16 @@ def make_otu_table(dataset):
         open(stats_file, 'w').write(output)
         print "and stats summarized"
 
-def make_qiime_reports(dataset):
+def make_qiime_reports(dataset, run_id):
     """Generate HTML output for reporting with Qiime.
 
     Makes an interactive heatmap, a Cytoscape network and a summary of
     community composition.
     """
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     otus_dir = run_root+dirs['otus']
     table_file = otus_dir+run_id+"_otu_table.txt"
     map_file = otus_dir+run_id+"_map.txt"

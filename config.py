@@ -4,7 +4,7 @@
 ## Data identification
 datasets = [{'source_fwd': 'Novophage5_1_sequence.txt',
              'source_rev': 'Novophage5_2_sequence.txt',
-             'run_id': 'Novophage5',
+             'set_id': 'Novophage5',
              'date': '9-22-11',
              'primers': {'fwdRA': 'caacgcgaAgaaccttacc', # workaround for R
                          'fwdRG': 'caacgcgaGgaaccttacc',

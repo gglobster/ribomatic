@@ -137,7 +137,7 @@ def FastqJointIterator(handleA, handleB):
         if not lineA or not lineB: return #StopIteration at end of file
     assert False, "Should not reach this line"
 
-def demux_illumina(dataset):
+def demux_illumina(dataset, max_pairs, run_id):
     """Demultiplex Illumina dataset.
 
     From separate forward/reverse read sets, combine read pairs and output
@@ -146,10 +146,10 @@ def demux_illumina(dataset):
     the rest, removing primer+tag and low-quality sequences.
     """
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
-    ori_root = run_root+dirs['master']
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
+    ori_root = root_dir+set_id+"/"+dirs['master']
     fwd_file = ori_root+dataset['source_fwd']
     rev_file = ori_root+dataset['source_rev']
     demux_root = run_root+dirs['demux']
@@ -294,7 +294,7 @@ def demux_illumina(dataset):
         # report on the progress
         if pair_count%1000000==0:
             print "\t", pair_count, "reads processed", datetime.now()
-        if pair_count == 1000: # for inspection purposes
+        if pair_count == max_pairs: # for testing purposes
             break
     print "\t", "Total", pair_count, "read pairs processed"
     print "\t", "Counts per sample:"
@@ -323,7 +323,7 @@ def demux_illumina(dataset):
                       "<td>", str(acc), "</td>",
                       "<td>", str(rej), "</td>",
                       "<td>", str(acc+rej), "</td>",
-                      "<td>", str(int((float(acc)/(acc+rej))*100)), 
+                      "<td>", str(int((float(acc)/(acc+rej))*100)),
                       "</td></tr>"]
         html_block = "".join(html_comps)
         open(qc_main_file, 'a').write(html_block)
@@ -351,7 +351,7 @@ def demux_illumina(dataset):
     dump_buffer(dmx_out, hits_dict['bad_tags']['buffer'])
     hits_dict['bad_tags']['buffer'] = []
     print "\t\t", "rejected (bad tags)", hits_dict['bad_tags']['countY'],\
-    datetime.now() 
+    datetime.now()
     # generate FastQC report (use --noextract to not open zipped reports)
     run_FastQC(dmx_out, report_root+qc_dir, '--quiet', ' ')
     #print "see QC report"
@@ -387,16 +387,16 @@ def demux_illumina(dataset):
     titles = 'Number of read pairs', 'Read pairs per sample'
     two_storey_bar_chart(series, sample_ids, legend, colors, cntsplt, titles)
 
-def merge_pair_libs(dataset):
+def merge_pair_libs(dataset, run_id):
     """Merge read pairs from Illumina sample libs and output FastA."""
     # identify inputs and outputs
-    run_id = dataset['run_id']
-    print " ", run_id
-    run_root = root_dir+run_id+"/"
+    set_id = dataset['set_id']
+    print " ", set_id
+    run_root = root_dir+set_id+"/"+run_id+"/"
     dmx_root = run_root+dirs['demux']
     merged_root = run_root+dirs['merged']
     report_root = run_root+dirs['reports']
-    master_file = run_root+dirs['master']+run_id+".fas"
+    master_file = run_root+dirs['merged']+run_id+".fas"
     ensure_dir(merged_root)
     ensure_dir(report_root)
     merger_file = report_root+"merged_pairs.html"
@@ -489,4 +489,3 @@ def merge_pair_libs(dataset):
     colors = 'g', 'r'
     titles = 'Number of read pairs', 'Read pairs merged per sample'
     two_storey_bar_chart(series, sample_ids, lgnd, colors, cntsplt, titles)
-    
